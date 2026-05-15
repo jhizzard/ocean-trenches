@@ -1,0 +1,11 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Generated data — regenerable by running the scanner
+cache/
+output/
+
+# macOS
+.DS_Store
