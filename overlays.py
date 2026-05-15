@@ -15,7 +15,7 @@ import matplotlib.pyplot as plt  # noqa: E402
 import numpy as np  # noqa: E402
 
 
-def render_topo(grid, png_path, contour_levels=22, max_px=1100):
+def render_topo(grid, png_path, contour_levels=22, max_px=750):
     """Render `grid` to a depth-colored PNG with white contour lines.
 
     Returns (west, south, east, north) bounds for the KML GroundOverlay.

@@ -10,10 +10,6 @@ Output is organised into toggleable folders:
 
 import simplekml
 
-# Paddle / shape icons hosted by Google; tinted by iconstyle.color.
-_DEEP_ICON = "http://maps.google.com/mapfiles/kml/paddle/wht-circle.png"
-_CLIFF_ICON = "http://maps.google.com/mapfiles/kml/shapes/triangle.png"
-
 M_TO_FT = 3.280839895
 
 
@@ -108,7 +104,8 @@ def _lookat(lon, lat, range_m):
 
 
 def build_kmz(results, path, with_overlays=False):
-    kml = simplekml.Kml(name="World Ocean Trenches — Deeps & Cliffs")
+    # Plain-ASCII name so Google Earth Web auto-titles the project from it.
+    kml = simplekml.Kml(name="World Ocean Trenches - Deeps and Cliffs")
     deep_folder = kml.newfolder(name="Deepest Points")
     cliff_folder = kml.newfolder(name="Steepest Cliffs & Walls")
     box_folder = kml.newfolder(name="Trench Outlines")
@@ -129,9 +126,9 @@ def build_kmz(results, path, with_overlays=False):
             )
             pnt.description = _deepest_description(result)
             pnt.lookat = _lookat(d["lon"], d["lat"], 35000)
-            pnt.style.iconstyle.icon.href = _DEEP_ICON
-            pnt.style.iconstyle.color = _depth_color(d["depth_m"])
-            pnt.style.iconstyle.scale = 1.2
+            # No custom icon: Earth's built-in marker always renders. An
+            # external icon URL (http://) is blocked by Earth Web's HTTPS
+            # page and leaves the pin as a gray placeholder.
 
         c = result["cliff"]
         drop = c["relief_m"]
@@ -142,9 +139,6 @@ def build_kmz(results, path, with_overlays=False):
         )
         cliff.description = _cliff_description(result)
         cliff.lookat = _lookat(c["lon"], c["lat"], 35000)
-        cliff.style.iconstyle.icon.href = _CLIFF_ICON
-        cliff.style.iconstyle.color = simplekml.Color.orange
-        cliff.style.iconstyle.scale = 1.3
 
         w, s, e, n = t.bbox
         pol = box_folder.newpolygon(
