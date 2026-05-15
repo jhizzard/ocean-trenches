@@ -11,6 +11,42 @@ Output is organised into toggleable folders:
 import simplekml
 
 M_TO_FT = 3.280839895
+_OUTLINE_STYLE_ID = "trench-outline-style"
+_CLIFF_STYLE_ID = "cliff-caution-style"
+_CLIFF_ICON = "https://maps.google.com/mapfiles/kml/shapes/caution.png"
+
+
+def _norm_lon(lon):
+    """Normalize longitude to the KML-valid [-180, 180] range."""
+    while lon > 180.0:
+        lon -= 360.0
+    while lon < -180.0:
+        lon += 360.0
+    if lon < -180.0:
+        return -180.0
+    if lon > 180.0:
+        return 180.0
+    return lon
+
+
+def _norm_lon_bounds(west, east):
+    """Normalize an east/west pair without breaking antimeridian boxes.
+
+    GMRT sometimes returns Aleutian windows as 180..193 degrees east. Google
+    Earth Web rejects those longitudes, so shift the whole box into the
+    equivalent -180..-167 range.
+    """
+    if east > 180.0 and west >= 0.0:
+        west -= 360.0
+        east -= 360.0
+        if west < -180.0:
+            west = -180.0
+    elif west < -180.0 and east <= 0.0:
+        west += 360.0
+        east += 360.0
+        if east > 180.0:
+            east = 180.0
+    return (_norm_lon(west), _norm_lon(east))
 
 
 def _depth_str(value_m):
@@ -40,6 +76,7 @@ def _dms(value, positive, negative):
 
 
 def _coord_str(lat, lon):
+    lon = _norm_lon(lon)
     return (f"{_dms(lat, 'N', 'S')}, {_dms(lon, 'E', 'W')}"
             f" ({lat:.5f}, {lon:.5f})")
 
@@ -98,14 +135,41 @@ def _lookat(lon, lat, range_m):
     the camera where it is.
     """
     return simplekml.LookAt(
-        longitude=lon, latitude=lat, altitude=0,
+        longitude=_norm_lon(lon), latitude=lat, altitude=0,
         heading=0, tilt=0, range=range_m,
     )
+
+
+def _add_outline_style(kml):
+    """One document-level style; Earth Web does not resolve folder-local IDs."""
+    style = simplekml.Style()
+    style._id = _OUTLINE_STYLE_ID  # simplekml has no public setter for ids.
+    style.polystyle.color = simplekml.Color.changealphaint(
+        40, simplekml.Color.blue)
+    style.linestyle.color = simplekml.Color.blue
+    style.linestyle.width = 2
+    kml.document._addstyle(style)
+
+
+def _add_cliff_style(kml):
+    """Shared caution-triangle style for steepest-cliff midpoint markers."""
+    style = simplekml.Style()
+    style._id = _CLIFF_STYLE_ID
+    style.iconstyle.icon.href = _CLIFF_ICON
+    style.iconstyle.scale = 1.2
+    style.iconstyle.hotspot = simplekml.HotSpot(
+        x=0.5, y=0.5,
+        xunits=simplekml.Units.fraction,
+        yunits=simplekml.Units.fraction,
+    )
+    kml.document._addstyle(style)
 
 
 def build_kmz(results, path, with_overlays=False):
     # Plain-ASCII name so Google Earth Web auto-titles the project from it.
     kml = simplekml.Kml(name="World Ocean Trenches - Deeps and Cliffs")
+    _add_outline_style(kml)
+    _add_cliff_style(kml)
     deep_folder = kml.newfolder(name="Deepest Points")
     cliff_folder = kml.newfolder(name="Steepest Cliffs & Walls")
     box_folder = kml.newfolder(name="Trench Outlines")
@@ -122,7 +186,7 @@ def build_kmz(results, path, with_overlays=False):
             m = abs(d["depth_m"])
             pnt = deep_folder.newpoint(
                 name=f"{t.name} — {m:,.0f} m / {m * M_TO_FT:,.0f} ft",
-                coords=[(d["lon"], d["lat"])],
+                coords=[(_norm_lon(d["lon"]), d["lat"])],
             )
             pnt.description = _deepest_description(result)
             pnt.lookat = _lookat(d["lon"], d["lat"], 35000)
@@ -135,27 +199,32 @@ def build_kmz(results, path, with_overlays=False):
         cliff = cliff_folder.newpoint(
             name=(f"{t.name} — {drop:,.0f} m / {drop * M_TO_FT:,.0f} ft drop "
                   f"({c['mean_slope_deg']:.0f}°)"),
-            coords=[(c["lon"], c["lat"])],
+            coords=[(_norm_lon(c["lon"]), c["lat"])],
         )
         cliff.description = _cliff_description(result)
         cliff.lookat = _lookat(c["lon"], c["lat"], 35000)
+        cliff._placemark.styleurl = f"#{_CLIFF_STYLE_ID}"
 
         w, s, e, n = t.bbox
         pol = box_folder.newpolygon(
             name=t.name,
-            outerboundaryis=[(w, s), (e, s), (e, n), (w, n), (w, s)],
+            outerboundaryis=[
+                (_norm_lon(w), s),
+                (_norm_lon(e), s),
+                (_norm_lon(e), n),
+                (_norm_lon(w), n),
+                (_norm_lon(w), s),
+            ],
         )
         # Range sized to the box so the whole outline fits in view.
         span_deg = max(e - w, n - s)
         pol.lookat = _lookat((w + e) / 2, (s + n) / 2,
                              span_deg * 111_320 * 1.4)
-        pol.style.polystyle.color = simplekml.Color.changealphaint(
-            40, simplekml.Color.blue)
-        pol.style.linestyle.color = simplekml.Color.blue
-        pol.style.linestyle.width = 2
+        pol._placemark.styleurl = f"#{_OUTLINE_STYLE_ID}"
 
         if overlay_folder is not None and result.get("overlay_png"):
             ow, os_, oe, on = result["overlay_bounds"]
+            ow, oe = _norm_lon_bounds(ow, oe)
             ground = overlay_folder.newgroundoverlay(name=f"{t.name} — topo")
             ground.icon.href = kml.addfile(result["overlay_png"])
             ground.latlonbox.west = ow

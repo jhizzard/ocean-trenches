@@ -6,13 +6,14 @@ For every trench (and a few specific steepness targets) this:
   2. finds a candidate deepest point and a candidate steepest cliff,
   3. re-fetches a small high-resolution window around each candidate and
      re-scans it -- the two-pass "zoom in" refinement,
-  4. writes everything to output/trench-pins.kmz for Google Earth.
+  4. writes output/trench-pins.kmz plus, with --overlays, Earth Web-safe
+     split imports that respect the browser's image-fetch limit.
 
 Usage:
     python trenches.py                 # scan everything
     python trenches.py mariana tonga   # scan targets matching these names
     python trenches.py --refresh       # ignore the cache, re-download
-    python trenches.py --overlays      # also embed depth-colored topo maps
+    python trenches.py --overlays      # also write Earth Web-safe overlay KMZs
 
 First full run downloads ~150 small grids and may take 10-20 min; grids are
 cached, so re-runs finish in seconds.
@@ -26,10 +27,22 @@ import sys
 from analyze import find_deepest, find_steepest_cliff, load_grid
 from build_kml import build_kmz
 from fetch import fetch_grid
+from tools.rewrite_kmz_for_earthweb import rewrite_kmz
 from trench_data import ALL_TARGETS
 
 OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                       "output", "trench-pins.kmz")
+EARTHWEB_OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "output", "trench-pins-earthweb-main.kmz")
+EARTHWEB_SUPPLEMENT = os.path.join(
+    os.path.dirname(os.path.abspath(__file__)),
+    "output", "trench-pins-earthweb-overlay-supplement.kmz",
+)
+
+# Earth Web project-features import currently accepts 20 image fetches per
+# import. The main Earth Web file uses one shared caution-triangle icon for all
+# cliff pins, leaving room for 19 topo overlays; the rest go in a supplement.
+EARTHWEB_MAIN_OVERLAY_LIMIT = 19
 
 # Half-width (degrees) of the high-resolution window used for the second pass.
 ZOOM_HALF_DEG = 0.25
@@ -199,8 +212,30 @@ def main(argv):
     os.makedirs(os.path.dirname(OUTPUT), exist_ok=True)
     build_kmz(results, OUTPUT, with_overlays=overlays)
     print(f"\nWrote {len(results)} target(s) to {OUTPUT}")
-    print("Open it in Google Earth, or import it into Google Earth Web "
-          "and share the project link.")
+    if overlays:
+        rewrite_kmz(
+            source=OUTPUT,
+            dest=EARTHWEB_OUTPUT,
+            overlay_start=0,
+            overlay_limit=EARTHWEB_MAIN_OVERLAY_LIMIT,
+            overlays_only=False,
+            overlay_folder_name=None,
+        )
+        rewrite_kmz(
+            source=OUTPUT,
+            dest=EARTHWEB_SUPPLEMENT,
+            overlay_start=EARTHWEB_MAIN_OVERLAY_LIMIT,
+            overlay_limit=None,
+            overlays_only=True,
+            overlay_folder_name="Topo Overlays - Supplement",
+        )
+        print(f"Wrote Earth Web main import to {EARTHWEB_OUTPUT}")
+        print(f"Wrote Earth Web overlay supplement to {EARTHWEB_SUPPLEMENT}")
+        print("In Google Earth Web, import the main file as project features, "
+              "then import the supplement into the same project.")
+    else:
+        print("Open it in Google Earth, or import it into Google Earth Web "
+              "as project features and share the project link.")
     return 0
 
 

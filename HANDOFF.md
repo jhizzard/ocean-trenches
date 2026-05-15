@@ -6,7 +6,27 @@
 
 ---
 
-## STATUS: the Google Earth Web output is FAILED AND NOT SOLVED
+## STATUS UPDATE: Google Earth Web output is solved with split imports
+
+Follow-up work after this handoff established the root cause empirically:
+
+- The "Untitled map / no folders" failure was caused by using Earth Web's
+  data-layer import path. The correct path is **Import file to project** and
+  **project features**.
+- Earth Web rejected the full KMZ because the generated KML had folder-local
+  outline styles, two Aleutian longitudes outside the KML-valid `[-180, 180]`
+  range, and more than 20 image fetches in one import.
+- The fixed browser deliverables are:
+  - `output/trench-pins-earthweb-main.kmz`
+  - `output/trench-pins-earthweb-overlay-supplement.kmz`
+- Import the main file as project features, then import the supplement into
+  the same Earth project. The main file contains all pins, folders, outlines,
+  descriptions, yellow caution triangles for steepest-cliff pins, and the
+  first 19 topo overlays. The supplement contains the remaining overlays.
+
+The historical notes below are preserved as the debugging record.
+
+## HISTORICAL STATUS: the Google Earth Web output was failed and not solved
 
 The Python scanner (the science/data pipeline) **works and is correct**. The
 **Google Earth deliverable does not work in Google Earth Web** and multiple

@@ -15,7 +15,8 @@ For each of ~18 major trenches (plus a few specific steepness targets):
    re-scans it — a two-pass "zoom in" refinement.
 4. Writes `output/trench-pins.kmz` with toggleable folders: Deepest Points,
    Steepest Cliffs & Walls, Trench Outlines, and (with `--overlays`) Topo
-   Overlays.
+   Overlays. It also writes Google Earth Web-safe split imports for browser
+   sharing.
 
 A "cliff" is the location of the greatest **sustained vertical relief over a
 fixed horizontal span** — the biggest sustained drop, not a single noisy pixel.
@@ -40,7 +41,7 @@ pip install -r requirements.txt
 python trenches.py                 # scan everything
 python trenches.py mariana tonga   # scan only matching targets
 python trenches.py --refresh       # ignore cache, re-download
-python trenches.py --overlays      # also embed depth-colored topo maps
+python trenches.py --overlays      # also write Earth Web-safe overlay KMZs
 ```
 
 First full run downloads ~150 small grids (10–20 min). Grids are cached under
@@ -50,17 +51,28 @@ First full run downloads ~150 small grids (10–20 min). Grids are cached under
 
 `--overlays` renders each target's steepest-cliff window as a depth-colored
 map with white contour lines (the Five Deeps Expedition cliff-map style) and
-drapes it on the seafloor as a KML `GroundOverlay`. They land in a **Topo
-Overlays** folder that is **off by default** — tick it on in Google Earth to
-reveal them. Adds ~10 MB to the KMZ.
+drapes it on the seafloor as a KML `GroundOverlay`.
+
+Google Earth Web project imports currently allow only 20 image fetches per
+import. The Earth Web output is therefore split:
+
+- `output/trench-pins-earthweb-main.kmz` — the main project: all pins,
+  folders, outlines, descriptions, yellow caution triangles for steepest-cliff
+  pins, and the first 19 topo overlays.
+- `output/trench-pins-earthweb-overlay-supplement.kmz` — the remaining topo
+  overlays, imported into the same Earth project.
+
+Use **Import file to project** and choose **project features**, not data-layer
+import. Data-layer import flattens the folder tree and loses the project
+behavior.
 
 ## Sharing the result
 
-`output/trench-pins.kmz` opens directly in **Google Earth Pro** (desktop) and
-the Google Earth mobile app. To share with other people: either send the
-`.kmz` file, or import it once into **Google Earth Web** and use its
-"share project" link. Google Earth has no global public pin registry — sharing
-always means a file or a link.
+For Google Earth Web sharing, import `output/trench-pins-earthweb-main.kmz`
+as project features, then import
+`output/trench-pins-earthweb-overlay-supplement.kmz` into the same project.
+Use the resulting Earth project's share link. Google Earth has no global public
+pin registry — sharing always means a file or a link.
 
 ## Honest caveats
 
@@ -84,3 +96,4 @@ always means a file or a link.
 | `overlays.py`    | Depth-colored topo-map PNG rendering (matplotlib) |
 | `build_kml.py`   | KMZ generation (simplekml) |
 | `trenches.py`    | Orchestrator + summary table (entry point) |
+| `tools/rewrite_kmz_for_earthweb.py` | Repackages the full KMZ into Earth Web-safe imports |
