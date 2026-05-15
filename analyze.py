@@ -112,8 +112,13 @@ def _relief_field(z, k):
 
 
 def find_steepest_cliff(grid, span_km=3.0):
-    """Locate the window of greatest sustained vertical relief."""
-    z = grid.z
+    """Locate the window of greatest sustained vertical relief.
+
+    Underwater features only: land and any above-water cells (elevation
+    >= 0) are dropped, so a window straddling a coastline cannot
+    masquerade as a giant submarine cliff.
+    """
+    z = np.where(grid.z >= 0.0, np.nan, grid.z)
     smooth = _despike(z)
     if np.all(np.isnan(smooth)):
         raise RuntimeError("grid has no corroborated data")

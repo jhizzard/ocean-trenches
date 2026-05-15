@@ -33,6 +33,9 @@ OUTPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 
 # Half-width (degrees) of the high-resolution window used for the second pass.
 ZOOM_HALF_DEG = 0.25
+# Half-width (degrees) of the window searched for a trench's steepest cliff,
+# centred on the deepest point so the search stays on the trench wall.
+CLIFF_SEARCH_HALF_DEG = 0.4
 # Horizontal span over which sustained vertical relief ("cliff") is measured.
 CLIFF_SPAN_KM = 3.0
 
@@ -100,18 +103,26 @@ def scan_target(target, refresh):
                 target.published.lat, target.published.lon,
             )
 
-    # Steepest cliff: coarse candidate, then high-res zoom. The high-res
-    # window's file path is kept so an optional topo overlay can be rendered.
-    cliff_candidate = find_steepest_cliff(coarse, span_km=CLIFF_SPAN_KM)
-    cwin = zoom_window(cliff_candidate["lat"], cliff_candidate["lon"],
-                       target.bbox)
+    # Steepest cliff. For a trench, search the inner wall AROUND THE DEEPEST
+    # POINT -- searching the whole (often ~1000 km wide) trench box lets the
+    # scan wander onto seamounts and open-ocean features far from the trench.
+    # For a point-of-interest the box already IS the feature, so a coarse
+    # candidate within it is fine.
+    if target.kind == "trench" and result["deepest"] is not None:
+        d = result["deepest"]
+        cwin = zoom_window(d["lat"], d["lon"], target.bbox,
+                           half=CLIFF_SEARCH_HALF_DEG)
+    else:
+        cand = find_steepest_cliff(coarse, span_km=CLIFF_SPAN_KM)
+        cwin = zoom_window(cand["lat"], cand["lon"], target.bbox)
+
     if cwin[2] - cwin[0] >= 0.05 and cwin[3] - cwin[1] >= 0.05:
         cliff_path = fetch_grid(*cwin, resolution="max", refresh=refresh)
         cliff = find_steepest_cliff(load_grid(cliff_path),
                                     span_km=CLIFF_SPAN_KM)
     else:
-        cliff_path = coarse_path  # candidate sat on an edge
-        cliff = cliff_candidate
+        cliff_path = coarse_path  # window collapsed on an edge
+        cliff = find_steepest_cliff(coarse, span_km=CLIFF_SPAN_KM)
     result["cliff"] = cliff
     result["cliff_grid_path"] = cliff_path
     return result

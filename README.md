@@ -19,6 +19,9 @@ For each of ~18 major trenches (plus a few specific steepness targets):
 
 A "cliff" is the location of the greatest **sustained vertical relief over a
 fixed horizontal span** — the biggest sustained drop, not a single noisy pixel.
+For a trench it is searched on the inner wall **around the deepest point**, so
+the result is the trench wall itself rather than an off-trench seamount; land
+is masked out so coastlines cannot masquerade as submarine cliffs.
 
 Every pin description gives depths in both **metres and feet**.
 
